@@ -7,6 +7,7 @@
     "EC2Instance" : {
       "Type" : "AWS::EC2::Instance",
       "Properties" : {
+        "Tags": [{"Key": "Name", "Value":"rpers-testing"}],
         "InstanceType" : "t2.medium",
         "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
         "KeyName" : "rpers-o-2",
@@ -17,9 +18,10 @@
           "# Install the files and packages from the metadata\n",
           "/opt/aws/bin/cfn-init -v ",
           "         --stack ", { "Ref" : "AWS::StackName" },
-          "         --resource WebServerInstance ",
+          "         --resource EC2Instance",
           "         --configsets Install ",
-          "         --region ", { "Ref" : "AWS::Region" }, "\n"
+          "         --region ", { "Ref" : "AWS::Region" },
+          "\n",
           ]]}}
       },
       "Metadata" : {
@@ -32,9 +34,21 @@
           },
 
           "Install" : {
+            "commands" : {
+              "install-pip": {
+                "command" : "yum install python-pip -y"
+              },
+              "install-ansible": {
+                "command" : "pip install ansible"
+              },
+              "ansible-pull" : {
+                "command": "ansible-pull -U https://github.com/rendicott/dcert/ play.yml"
+              }
+            },
             "packages" : {
               "yum" : {
-                "ansible"          : []
+                "epel-release"          : [],
+                "git": []
               }
             },
 

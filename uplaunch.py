@@ -1,6 +1,8 @@
 import boto3
 import sys
 import uuid
+import time
+import json
 
 # arn:aws:s3:::raws-builds
 stack_prefix = "rpers-testing-"
@@ -16,6 +18,35 @@ def handle_response(robject):
         print robject 
 
 
+def cfn_poller(client, stack_name):
+    counter =0
+    max = 30
+    done = False
+    while True:
+        if counter > max:
+            break
+        response = client.describe_stacks(
+            StackName=stack_name,
+        )
+        handle_response(response)
+        for stack in response.get("Stacks"):
+            if stack.get("StackName") == stack_name:
+                if stack.get("StackStatus") == "CREATE_COMPLETE":
+                    print json.dumps(
+                        stack.get("Outputs"),
+                        indent=4
+                    )
+                    done = True
+                    break
+                else:
+                    print("Status: '%s', Attempt: '%d/%d'" % (stack.get("StackStatus"), counter, max))
+        if done:
+            break
+        time.sleep(10)
+        counter += 1
+
+
+
 session = boto3.Session()
 client = session.client("s3")
 with open(template, 'rb') as f:
@@ -28,7 +59,6 @@ with open(template, 'rb') as f:
     
 stack_name = stack_prefix + str(uuid.uuid1())
 print("Attempting to create '%s' using template '%s'" % (stack_name, url))
-session = boto3.Session()
 client = session.client("cloudformation")
 response = client.create_stack(
     StackName=stack_name,
@@ -36,3 +66,4 @@ response = client.create_stack(
 )
 handle_response(response)
 print response
+cfn_poller(client, stack_name)
