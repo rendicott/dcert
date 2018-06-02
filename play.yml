@@ -1,0 +1,5 @@
+hosts: localhost
+connection: smart
+tasks:
+  - name: test play
+    raw: touch /tmp/whoa
