@@ -36,6 +36,13 @@ def cfn_poller(client, stack_name):
                         stack.get("Outputs"),
                         indent=4
                     )
+                    try:
+                        # grab the pub ip if possible
+                        for output in stack.get("Outputs"):
+                            if output.get("OutputKey") == "PublicIP":
+                                print output.get("OutputValue")
+                    except:
+                        pass
                     done = True
                     break
                 else:

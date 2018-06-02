@@ -1,0 +1,66 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+  
+    "Description" : "rpers-testing",
+  
+    "Resources" : {
+      "EC2Instance" : {
+        "Type" : "AWS::EC2::Instance",
+        "Properties" : {
+          "Tags": [{"Key": "Name", "Value":"rpers-testing"}],
+          "InstanceType" : "t2.medium",
+          "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+          "KeyName" : "rpers-o-2",
+          "ImageId" : "ami-922914f7",
+          "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+            "#!/bin/bash -xe\n",
+            "export STACKNAME=", {"Ref": "AWS::Stackname"}, "\n",
+            "export RESOURCE=", "EC2Instance", "\n",
+            "export REGION=", {"Ref": "AWS::Region"}, "\n",
+            "yum install python-pip -y\n",
+            "yum install git -y\n",
+            "pip install ansible\n",
+            "/usr/local/bin/ansible-pull -U https://github.com/rendicott/dcert/ play.yml\n",
+            "\n"
+            ]]}}
+          },
+          "CreationPolicy" : {
+            "ResourceSignal": {
+                "Count": 1,
+                "Timeout": "PT10M"
+            }
+          }
+    },
+      "InstanceSecurityGroup" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Properties" : {
+          "GroupDescription" : "Enable SSH access via port 22",
+          "SecurityGroupIngress" : [ {
+            "IpProtocol" : "tcp",
+            "FromPort" : "22",
+            "ToPort" : "22",
+            "CidrIp" : "75.15.178.83/32"
+          } ]
+        }
+      }
+    },
+  
+    "Outputs" : {
+      "InstanceId" : {
+        "Description" : "InstanceId of the newly created EC2 instance",
+        "Value" : { "Ref" : "EC2Instance" }
+      },
+      "AZ" : {
+        "Description" : "Availability Zone of the newly created EC2 instance",
+        "Value" : { "Fn::GetAtt" : [ "EC2Instance", "AvailabilityZone" ] }
+      },
+      "PublicDNS" : {
+        "Description" : "Public DNSName of the newly created EC2 instance",
+        "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicDnsName" ] }
+      },
+      "PublicIP" : {
+        "Description" : "Public IP address of the newly created EC2 instance",
+        "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicIp" ] }
+      }
+    }
+  }

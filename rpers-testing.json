@@ -35,13 +35,13 @@
 
           "Install" : {
             "commands" : {
-              "install-pip": {
+              "01-install-pip": {
                 "command" : "yum install python-pip -y"
               },
-              "install-ansible": {
+              "02-install-ansible": {
                 "command" : "pip install ansible"
               },
-              "ansible-pull" : {
+              "03-ansible-pull" : {
                 "command": "ansible-pull -U https://github.com/rendicott/dcert/ play.yml"
               }
             },
