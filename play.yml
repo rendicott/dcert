@@ -7,5 +7,5 @@
     - name: touch it
       raw: "touch /tmp/helo"
     - name: signal
-      raw: "/opt/aws/bin/cfn-signal -e0 {{ lookup('env', 'WAITHANDLE') }}"
+      raw: "/opt/aws/bin/cfn-signal -e0 '{{ lookup('env', 'WAITHANDLE') }}''"
 ...
