@@ -4,6 +4,19 @@
     "Description" : "rpers-testing",
   
     "Resources" : {
+        "ApplicationWaitCondition" : {
+            "DependsOn" : "EC2Instance",
+            "Properties" : {
+                "Handle" : {
+                "Ref" : "ApplicationWaitHandle"
+                },
+                "Timeout" : "4500"
+            },
+            "Type" : "AWS::CloudFormation::WaitCondition"
+            },
+            "ApplicationWaitHandle" : {
+            "Type" : "AWS::CloudFormation::WaitConditionHandle"
+            },
       "EC2Instance" : {
         "Type" : "AWS::EC2::Instance",
         "Properties" : {
@@ -14,21 +27,13 @@
           "ImageId" : "ami-922914f7",
           "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
             "#!/bin/bash -xe\n",
-            "export STACKNAME=", {"Ref": "AWS::Stackname"}, "\n",
-            "export RESOURCE=", "EC2Instance", "\n",
-            "export REGION=", {"Ref": "AWS::Region"}, "\n",
+            "export WAITHANDLE=", {"Ref": "ApplicationWaitHandle"}, "\n",
             "yum install python-pip -y\n",
             "yum install git -y\n",
             "pip install ansible\n",
             "/usr/local/bin/ansible-pull -U https://github.com/rendicott/dcert/ play.yml\n",
             "\n"
             ]]}}
-          },
-          "CreationPolicy" : {
-            "ResourceSignal": {
-                "Count": 1,
-                "Timeout": "PT10M"
-            }
           }
     },
       "InstanceSecurityGroup" : {
