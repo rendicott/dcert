@@ -7,5 +7,5 @@
     - name: touch it
       raw: "touch /tmp/helo"
     - name: signal
-      raw: "cfn-signal -e0 --stack {{ lookup('env','STACKNAME') }} --resource {{ lookup('env', 'RESOURCE') }} --region {{ lookup('env', 'REGION' }}"
+      raw: "cfn-signal -e0 --stack {{ lookup('env','STACKNAME') }} --resource {{ lookup('env', 'RESOURCE') }} --region {{ lookup('env', 'REGION') }}"
 ...
