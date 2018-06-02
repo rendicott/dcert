@@ -1,5 +1,5 @@
 ---
-- name: test stuff
+- name: test stuff2
   hosts: localhost
   gather_facts: false
   connection: smart
