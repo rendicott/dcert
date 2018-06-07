@@ -1,0 +1,35 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+  
+    "Description" : "rpers-prep environment",
+  
+    "Resources" : {
+      "natGateway" : {
+        "Type" : "AWS::EC2::NatGateway",
+        "Properties" : {
+            "AllocationId": {"Fn::GetAtt": [ "natIp", "AllocationId"]},
+            "SubnetId": "subnet-d74849be"
+          }
+      },
+      "natIp" : {
+        "Type": "AWS::EC2::EIP",
+        "Properties": {
+          "Domain": "vpc"
+        }
+      },
+      "internetRoute": {
+        "Type" : "AWS::EC2::Route",
+        "Properties" : {
+          "DestinationCidrBlock" : "0.0.0.0/0",
+          "NatGatewayId" : {"Ref": "natGateway"},
+          "RouteTableId" : "rtb-3348c95b" 
+        }
+      }
+    }, 
+    "Outputs" : {
+      "NatGateway" : {
+        "Description" : "The NAT Gateway created with the stack",
+        "Value" : { "Ref" : "natGateway" }
+      }
+      }
+  }
