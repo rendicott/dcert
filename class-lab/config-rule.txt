@@ -1,0 +1,63 @@
+[ec2-user@ip-10-96-10-215 ~]$ cat config-rule-RegionBound.json
+{
+    "ConfigRuleName": "IAM-restrictedRegions",
+    "Source": {
+        "Owner": "CUSTOM_LAMBDA",
+        "SourceIdentifier": "arn:aws:lambda:us-east-1:920558003879:function:ConfigRule-IAM-RestrictedRegions",
+        "SourceDetails": [
+            {
+                "EventSource": "aws.config",
+                "MessageType": "ScheduledNotification"
+            },
+            {
+                "EventSource": "aws.config",
+                "MessageType": "ConfigurationItemChangeNotification"
+            },
+            {
+                "EventSource": "aws.config",
+                "MessageType": "OversizedConfigurationItemChangeNotification"
+            }
+        ]
+    },
+    "InputParameters": "{}",
+    "Scope": {
+        "ComplianceResourceTypes": [
+            "AWS::IAM::Policy",
+            "AWS::IAM::Role"
+        ]
+    }
+}
+[ec2-user@ip-10-96-10-215 ~]$ cat config-rule-
+config-rule-PowerfulActions.json  config-rule-RegionBound.json
+[ec2-user@ip-10-96-10-215 ~]$ cat config-rule-
+config-rule-PowerfulActions.json  config-rule-RegionBound.json
+[ec2-user@ip-10-96-10-215 ~]$ cat config-rule-PowerfulActions.json
+{
+  "ConfigRuleName": "IAM-PowerfulActions",
+  "Source": {
+      "Owner": "CUSTOM_LAMBDA",
+      "SourceIdentifier": "arn:aws:lambda:us-east-1:920558003879:function:ConfigRule-IAM-PowerActions",
+      "SourceDetails": [
+          {
+              "EventSource": "aws.config",
+              "MessageType": "ConfigurationItemChangeNotification"
+          },
+          {
+              "EventSource": "aws.config",
+              "MessageType": "OversizedConfigurationItemChangeNotification"
+          },
+          {
+              "EventSource": "aws.config",
+              "MessageType": "ScheduledNotification"
+          }
+      ]
+  },
+  "InputParameters": "{}",
+  "Scope": {
+      "ComplianceResourceTypes": [
+          "AWS::IAM::Policy",
+          "AWS::IAM::Role"
+      ]
+  }
+}
+[ec2-user@ip-10-96-10-215 ~]$
