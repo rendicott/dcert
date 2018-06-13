@@ -1,11 +1,11 @@
 ---
-- name: test stuff2
+- name: boostrap new box
   hosts: localhost
   gather_facts: false
   connection: smart
   tasks:
-    - name: touch it
-      raw: "touch /tmp/helo"
+    - name: upgrade all packages
+      yum: name=* state=latest
     - name: signal
       raw: "/opt/aws/bin/cfn-signal -e0 '{{ lookup('env', 'WAITHANDLE') }}'"
 ...

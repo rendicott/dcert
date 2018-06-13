@@ -22,6 +22,7 @@
         "Properties" : {
           "Tags": [{"Key": "Name", "Value":"rpers-testing"}],
           "InstanceType" : "t2.medium",
+          "IamInstanceProfile": {"Ref": "adminAccessRole"},
           "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
           "KeyName" : "rpers-o-2",
           "ImageId" : "ami-922914f7",
@@ -47,9 +48,35 @@
             "CidrIp" : "75.15.178.83/32"
           } ]
         }
+      },
+      "adminAccessRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          },
+          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AdministratorAccess"],
+          "RoleName": "admin-access-profile"
       }
+      },
+      "adminAccessInstanceProfile": {
+        "Type": "AWS::IAM::InstanceProfile",
+        "Properties": {
+           "Roles": [{"Ref": "adminAccessRole"}],
+           "InstanceProfileName": "admin-access-profile" 
+        }
+     }    
     },
-  
+
     "Outputs" : {
       "InstanceId" : {
         "Description" : "InstanceId of the newly created EC2 instance",

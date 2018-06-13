@@ -5,7 +5,7 @@ import time
 import json
 
 # arn:aws:s3:::raws-builds
-stack_prefix = "rpers-testing-"
+stack_prefix = sys.argv[2]
 bucketname = "raws-builds"
 region = "us-east-2"
 template = sys.argv[1]
@@ -31,7 +31,11 @@ def cfn_poller(client, stack_name):
         handle_response(response)
         for stack in response.get("Stacks"):
             if stack.get("StackName") == stack_name:
-                if stack.get("StackStatus") == "CREATE_COMPLETE":
+                stack_status = stack.get("StackStatus") 
+                if stack_status == "ROLLBACK_COMPLETE":
+                    done=True
+                    break
+                if stack_status == "CREATE_COMPLETE":
                     print json.dumps(
                         stack.get("Outputs"),
                         indent=4
@@ -69,7 +73,10 @@ print("Attempting to create '%s' using template '%s'" % (stack_name, url))
 client = session.client("cloudformation")
 response = client.create_stack(
     StackName=stack_name,
-    TemplateURL=url
+    TemplateURL=url,
+    Capabilities=[
+        "CAPABILITY_NAMED_IAM"
+    ]
 )
 handle_response(response)
 print response
