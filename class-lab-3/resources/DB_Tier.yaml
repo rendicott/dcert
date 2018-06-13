@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Template to build the
+  base for DevOps Lab.
+Parameters:
+  TableName:
+    Type: String
+    Description: Name for the Nouns/Verbs/Adjectives DynDB Table
+    Default: nouns_verbs_and_adjectives
+Resources:
+  DynDBTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "guid_str"
+          AttributeType: "S"
+        - AttributeName: "paragraph_html_str"
+          AttributeType: "S"
+      KeySchema:
+         - AttributeName: "guid_str"
+           KeyType: "HASH"
+         - AttributeName: "paragraph_html_str"
+           KeyType: "RANGE"
+      ProvisionedThroughput:
+          ReadCapacityUnits: "5"
+          WriteCapacityUnits: "5"
+      TableName: !Ref TableName
+Outputs:
+  DynDBARN:
+    Value: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynDBTable}
+    Description: ARN of the DynamoDB Table
+    Export:
+      Name: !Sub "${AWS::StackName}-DynDB-ARN"

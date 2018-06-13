@@ -1,0 +1,451 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Template to build the
+  base for DevOps Lab 3
+Parameters:
+  NetworkStackName:
+    Description: Name of an active CloudFormation stack that contains the networking resources
+    Type: String
+  DBStackName:
+    Description: Name of an active CloudFormation stack that contains the DynamoDB Table
+    Type: String
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Keyname for the keypair that Qwiklab will use to launch EC2 instances
+  S3PathPrefix:
+    Type: String
+    Description: "The path prefix where lab resources are stored (Leading and trailing slash required!)"
+    Default: "courses/AWS-200-DOP/2.1.3/lab-3-CloudFormation"
+Mappings:
+  AmazonLinuxAMI:
+    us-east-1:
+      AMI: ami-08111162
+    us-east-2:
+      AMI: ami-06547163
+    us-west-1:
+      AMI: ami-1b0f7d7b
+    us-west-2:
+      AMI: ami-f0091d91
+    eu-west-1:
+      AMI: ami-31328842
+    eu-central-1:
+      AMI: ami-e2df388d
+    ap-northeast-1:
+      AMI: ami-f80e0596
+    ap-northeast-2:
+      AMI: ami-6598510b
+    ap-southeast-1:
+      AMI: ami-c9b572aa
+    ap-southeast-2:
+      AMI: ami-f2210191
+    sa-east-1:
+      AMI: ami-1e159872
+Resources:
+# Networking
+  AppTierSG:
+   Type: AWS::EC2::SecurityGroup
+   Properties:
+     GroupDescription: Security Group for AIO App Tier
+     VpcId:
+       Fn::ImportValue: !Sub ${NetworkStackName}-VPCID
+     Tags:
+       - Key: "Name"
+         Value: "AIO App Tier SG"
+       - Key: "ENV"
+         Value: "Production"
+       - Key: "App"
+         Value: "DevOps - Lab 3"
+     SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: 22
+         ToPort: 22
+         CidrIp: 0.0.0.0/0
+       - IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+       - IpProtocol: tcp
+         FromPort: 81
+         ToPort: 81
+         SourceSecurityGroupId: !Ref APIELBsg
+       - IpProtocol: tcp
+         FromPort: 82
+         ToPort: 82
+         SourceSecurityGroupId: !Ref SaveELBsg
+  SaveELBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+     GroupDescription: Security Group Save Tier ELB
+     VpcId:
+       Fn::ImportValue: !Sub ${NetworkStackName}-VPCID
+     Tags:
+       - Key: "Name"
+         Value: "ELB SG"
+       - Key: "ENV"
+         Value: "Production"
+       - Key: "App"
+         Value: "Madlib Save - Public"
+     SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  MadLibSaveELB:
+    Type: "AWS::ElasticLoadBalancing::LoadBalancer"
+    DependsOn:
+      - SaveELBsg
+    Properties:
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 60
+        Target: TCP:82
+        Timeout: 59
+        UnhealthyThreshold: 10
+      LoadBalancerName: Save-ELB
+      Listeners:
+        - InstancePort: 82
+          InstanceProtocol: HTTP
+          LoadBalancerPort: 80
+          Protocol: HTTP
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref SaveELBsg
+      Subnets:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-A
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-B
+  SiteELBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+     GroupDescription: Security Group Site Tier ELB
+     VpcId:
+       Fn::ImportValue: !Sub ${NetworkStackName}-VPCID
+     Tags:
+       - Key: "Name"
+         Value: "ELB Site SG"
+       - Key: "ENV"
+         Value: "Production"
+       - Key: "App"
+         Value: "Madlib Site - Public"
+     SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  MadLibSiteELB:
+    Type: "AWS::ElasticLoadBalancing::LoadBalancer"
+    DependsOn:
+      - SaveELBsg
+    Properties:
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 30
+        Target: HTTP:80/index.html
+        Timeout: 10
+        UnhealthyThreshold: 10
+      LoadBalancerName: Site-ELB
+      Listeners:
+        - InstancePort: 80
+          InstanceProtocol: HTTP
+          LoadBalancerPort: 80
+          Protocol: HTTP
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref SiteELBsg
+      Subnets:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-A
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-B
+  APIELBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+     GroupDescription: Security Group Save Tier ELB
+     VpcId:
+       Fn::ImportValue: !Sub ${NetworkStackName}-VPCID
+     Tags:
+       - Key: "Name"
+         Value: "ELB SG"
+       - Key: "ENV"
+         Value: "Production"
+       - Key: "App"
+         Value: "Madlib API - Public"
+     SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+  MadLibAPIELB:
+    Type: "AWS::ElasticLoadBalancing::LoadBalancer"
+    DependsOn:
+      - APIELBsg
+    Properties:
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 60
+        Target: TCP:81
+        Timeout: 59
+        UnhealthyThreshold: 10
+      LoadBalancerName: API-ELB
+      Listeners:
+        - InstancePort: 81
+          InstanceProtocol: HTTP
+          LoadBalancerPort: 80
+          Protocol: HTTP
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref APIELBsg
+      Subnets:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-A
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-B
+  # IAM Setup
+  LambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          -  Effect: "Allow"
+             Principal:
+               Service:
+                 - 'lambda.amazonaws.com'
+             Action:
+               - sts:AssumeRole
+      Path: '/'
+      Policies:
+        - PolicyName: AllowLambdaSimulateAccess
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action: ['logs:CreateLogGroup',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents']
+              Resource: arn:aws:logs:*:*:*
+            - Effect: Allow
+              Action: ['config:GetResourceConfigHistory',
+                'config:PutEvaluations',
+                'config:StartConfigRulesEvaluation',
+                'iam:GetPolicy',
+                'iam:GetPolicyVersion',
+                'iam:SimulateCustomPolicy',
+                'iam:ListEntitiesforPolicy',
+                'iam:GetGroup',
+                'logs:*',
+                's3:GetBucketPolicy']
+              Resource: '*'
+  AppRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - 'ec2.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+
+      Path: '/'
+      Policies:
+        - PolicyName: MabLib-App-Policy
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action: ['dynamodb:DescribeLimits',
+                  'dynamodb:DescribeReservedCapacity',
+                  'dynamodb:DescribeReservedCapacityOfferings',
+                  'dynamodb:DescribeTable',
+                  'dynamodb:GetItem',
+                  'dynamodb:GetRecords',
+                  'dynamodb:ListTables',
+                  'dynamodb:PutItem',
+                  'dynamodb:Query',
+                  'dynamodb:Scan',
+                  'dynamodb:UpdateItem']
+              Resource:
+                Fn::ImportValue: !Sub ${DBStackName}-DynDB-ARN
+  InstProfMadLib:
+   Type: "AWS::IAM::InstanceProfile"
+   DependsOn:
+     - AppRole
+   Properties:
+     Roles:
+       - !Ref AppRole
+     InstanceProfileName: MadLib-App-role
+  # Custom Resource
+  WebSiteTechCustomResource:
+    Type: "Custom::LambdaSiteValidate"
+    DependsOn:
+      - WebServersAutoScalingGroup
+    Properties:
+      ServiceToken:
+        !GetAtt WebSiteValidatorFunction.Arn
+      UrlChecks:
+        - !Sub |
+            http://${MadLibSiteELB.DNSName}/index.html
+  WebSiteValidatorFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Code:
+        S3Bucket: !Sub ${AWS::Region}-tcprod
+        S3Key: !Sub ${S3PathPrefix}/scripts/cfnverifierlambda.zip
+      Description: "Custom Reources Lambda Function to Ensure the the site deployed returns a status 200"
+      FunctionName: CfnVerifierLambda
+      Handler: cfn-verifier-lambda.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs6.10
+      Timeout: 3
+    #  Tags:
+    #    Resource Tag
+  # App Tier - Autoscaled
+  WebServersAutoScalingGroup:
+    Type: "AWS::AutoScaling::AutoScalingGroup"
+    DependsOn:
+      - WebServersLaunchConfig
+      - AppTierSG
+      - MadLibSaveELB
+      - MadLibAPIELB
+    CreationPolicy:
+      ResourceSignal:
+        Count: '1'
+        Timeout: PT15M
+    ####### TASK 3: TODO 1: START:##########
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: 'true'
+      AutoScalingRollingUpdate:
+        MinInstancesInService: '0'
+        MaxBatchSize: '1'
+        WaitOnResourceSignals: 'true'
+        PauseTime: PT10M
+    ####### TASK 3: TODO 1: END: ##########
+    Properties:
+      Cooldown: 60
+      DesiredCapacity: 1
+      HealthCheckGracePeriod: 60
+      LaunchConfigurationName: !Ref WebServersLaunchConfig
+      LoadBalancerNames:
+        - !Ref MadLibAPIELB
+        - !Ref MadLibSaveELB
+        - !Ref MadLibSiteELB
+      MaxSize: 1
+      MinSize: 1
+      Tags:
+       - Key: "Name"
+         Value: "AIO App Tier - AutoScaled"
+         PropagateAtLaunch: true
+       - Key: "ENV"
+         Value: "Production"
+         PropagateAtLaunch: true
+       - Key: "App"
+         Value: "DevOps - Lab 3"
+         PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-A
+        - Fn::ImportValue: !Sub ${NetworkStackName}-PUBSUB-B
+  WebServersLaunchConfig:
+    Type: "AWS::AutoScaling::LaunchConfiguration"
+    ######## TASK 3: TODO 2: START:##########
+    Metadata:
+      AWS::CloudFormation::Init:
+       config:
+         files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackName}
+                region=${AWS::Region}
+                interval=5
+              mode: "000400"
+              owner: "root"
+              group: "root"
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.add, post.update,
+                path=Resources.WebServersLaunchConfig.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -s ${AWS::StackName} -r WebServersLaunchConfig --region ${AWS::Region} runas=root
+              mode: "000644"
+              owner: "root"
+              group: "root"
+    ######## TASK 3: TODO 2: END: ############
+
+        ######## TASK 4: TODO 1: START: ####
+
+        ######## TASK 4: TODO 1: END: ####
+
+        ######## TASK 4: TODO 2 : START:##########
+
+        ######## TASK 4: TODO 2 : END: ############
+    Properties:
+      IamInstanceProfile: !Ref InstProfMadLib
+      ImageId: !FindInMap [AmazonLinuxAMI, !Ref "AWS::Region", AMI]
+      InstanceMonitoring: true
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref AppTierSG
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash -ex
+
+            # Update / Install
+            yum update -y
+            yum install -y httpd
+
+            ######## TASK 3: TODO 3: START:##################
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServersLaunchConfig --region ${AWS::Region}
+
+            ######## TASK 3: TODO 3: END: ##################
+
+            # Creating user Account
+            if [ ! -d "/home/appuser" ]; then
+            useradd -m appuser
+            fi
+            # ENV Setup
+            APIELB=${MadLibAPIELB.DNSName}
+            SaveELB=${MadLibSaveELB.DNSName}
+            # Fetching and installing Code
+            wget  https://${AWS::Region}-tcprod.s3.amazonaws.com/${S3PathPrefix}/scripts/madlibs-v1.0-site.zip
+            unzip madlibs-v1.0-site.zip -d /var/www/html/
+            wget  https://${AWS::Region}-tcprod.s3.amazonaws.com/${S3PathPrefix}/scripts/madlibs-v1.0-api.zip
+            unzip madlibs-v1.0-api.zip -d /opt/
+            wget  https://${AWS::Region}-tcprod.s3.amazonaws.com/${S3PathPrefix}/scripts/madlibs-v1.0-save.zip
+            unzip madlibs-v1.0-save.zip -d /opt/
+            # Setting Up Configs
+            sed -i -- "s|APIELB|$APIELB|g" /var/www/html/js/env.js
+            sed -i -- "s|SaveELB|$SaveELB|g" /var/www/html/js/env.js
+            sed -i -- "s|region|${AWS::Region}|g" /opt/save/creds.json
+            # Start Apache as the Site is Deployed
+            service httpd start
+            # Now lets finish up the backend apps
+            # Installing Node
+            chmod 755 -R /var/www/html
+            su appuser <<'EOF'
+            cd ~/
+            curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+            nvm install 6.10.3 > ~/install.log
+            nvm use 6.10.3 > ~/settingDefault.log
+            EOF
+
+            # Starting Appelicaion
+            nohup /home/appuser/.nvm/versions/node/v6.10.3/bin/node /opt/API/app.js > /dev/null 2>&1 &
+            nohup /home/appuser/.nvm/versions/node/v6.10.3/bin/node /opt/save/app.js > /dev/null 2>&1 &
+
+            # Firing off Signal Event Quickly hit the Custom Resource, Sleeping for 2m to ensure
+            # that host process are running and Marked health by elb before we fire off test
+            sleep 1m
+
+            ######### TASK 3: TODO 4: START:######
+            /opt/aws/bin/cfn-hup || error_exit
+            ######### TASK 3: TODO 4: END: ######
+
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource WebServersAutoScalingGroup --region ${AWS::Region}
+Outputs:
+  MadLibSiteDNS:
+    Description: The DNS Name of the ELB in front of the app Servers
+    Value: !GetAtt MadLibSiteELB.DNSName
