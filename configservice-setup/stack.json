@@ -51,6 +51,66 @@
 				}
 			}
 		},
+		"configPolicyBucketWriter": {
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"Roles": [{
+					"Ref": "configRole"
+				}],
+				"PolicyName": "config-policy-bucket-writer",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+							"Action": [
+								"s3:PutObject"
+							],
+							"Resource": {
+								"Fn::Join": ["", [
+									"arn:aws:s3:::",
+									{
+										"Ref": "configBucket"
+									},
+									"/AWSLogs/",
+									{
+										"Ref": "AWS::AccountId"
+									},
+									"/*"
+								]]
+							},
+							"Condition": {
+								"StringEquals": {
+									"s3:x-amz-acl": [
+										"bucket-owner-full-control"
+									]
+								}
+							},
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"s3:GetObjectAcl"
+							],
+							"Resource": {
+								"Fn::Join": ["", [
+									"arn:aws:s3:::",
+									{
+										"Ref": "configBucket"
+									}
+								]]
+							},
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"config:Put*"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						}
+					]
+				}
+			}
+		},
 		"configChannel": {
 			"Type": "AWS::Config::DeliveryChannel",
 			"Properties": {
@@ -60,7 +120,6 @@
 				"S3BucketName": {
 					"Ref": "configBucket"
 				},
-				"S3KeyPrefix": "config-",
 				"SnsTopicARN": {
 					"Ref": "configTopic"
 				}
