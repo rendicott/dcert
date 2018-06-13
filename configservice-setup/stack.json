@@ -1,108 +1,100 @@
 {
-    "AWSTemplateFormatVersion" : "2010-09-09",
-  
-    "Description" : "setup configservice",
-  
-    "Resources" : {
-      "configChannel": {
-        "Type" : "AWS::Config::DeliveryChannel",
-        "Properties" : {
-          "ConfigSnapshotDeliveryProperties" : 
-            {"DeliveryFrequency": "Six_Hours"},
-          "Name" : "configChannel",
-          "S3BucketName" : {"Ref": "configBucket"},
-          "S3KeyPrefix" : "config-",
-          "SnsTopicARN" : {"Ref": "configTopic"}
-        }
-      }, 
-      "configBucket": {
-          "Type": "AWS::S3::Bucket"
-      },
-      "configRecorder": {
-        "Type" : "AWS::Config::ConfigurationRecorder",
-        "Properties" : {
-          "Name" : "config-recorder",
-          "RecordingGroup" : {
-            "AllSupported" : true,
-            "IncludeGlobalResourceTypes" : true
-          },
-          "RoleARN" : { "Fn::GetAtt" : [ "configRole", "Arn" ] }
-        }
-      },
-      "configRole": {
-        "Type": "AWS::IAM::Role",
-        "Properties": {
-          "AssumeRolePolicyDocument": {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Service": "config.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
-              }
-            ]
-          },
-          "ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AWSConfigRole"],
-          "RoleName": "config-role"
-        }
-      },
-      "configPolicy": {
-        "Type" : "AWS::IAM::Policy",
-        "Properties" : { 
-          "Roles": [{"Ref":"configRole"}], 
-          "PolicyDocument" : {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": [
-                        "lambda:*"
-                    ],
-                    "Resource": "*",
-                    "Effect": "Allow"
-                }
-            ]
-        },
-          "PolicyName" : "config-role-supplement"
-        }
-      },
-      "configTopic": {
-        "Type" : "AWS::SNS::Topic",
-        "Properties" : {
-          "DisplayName" : "config-topic",
-          "TopicName" : "config-topic" 
-        }
-      },
-      "configTopicPolicy": {
-       "Type": "AWS::SNS::TopicPolicy",
-       "Properties": {      
-           "PolicyDocument": {
-             "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Action": [
-                        "sns:Publish"
-                    ],
-                    "Resource": "*",
-                    "Principal": {"Service": "config.amazonaws.com"},
-                    "Effect": "Allow"
-                }]
-           },
-           "Topics": [{"Ref": "configTopic"}]
-       }
-    }
-},
-    "Outputs" : {
-      "configBucket" : {
-        "Description" : "S3 bucket where config is stored",
-        "Value" : { "Ref" : "configBucket" }
-      },
-      "configTopic" : {
-        "Description" : "SNS Topic where config events go.",
-        "Value" : { "Ref": "configTopic"}
-      }
-    }
-    }
+	"AWSTemplateFormatVersion": "2010-09-09",
 
- 
+	"Description": "setup configservice",
+
+	"Resources": {
+		"configRecorder": {
+			"Type": "AWS::Config::ConfigurationRecorder",
+			"Properties": {
+				"RecordingGroup": {
+					"AllSupported": true,
+					"IncludeGlobalResourceTypes": true
+				},
+				"RoleARN": {
+					"Fn::GetAtt": ["configRole", "Arn"]
+				}
+			}
+		},
+		"configRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "config.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}]
+				},
+				"ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AWSConfigRole"]
+			}
+		},
+		"configPolicy": {
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"Roles": [{
+					"Ref": "configRole"
+				}],
+				"PolicyName": "config-policy",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Action": [
+							"lambda:*"
+						],
+						"Resource": "*",
+						"Effect": "Allow"
+					}]
+				}
+			}
+		},
+		"configChannel": {
+			"Type": "AWS::Config::DeliveryChannel",
+			"Properties": {
+				"ConfigSnapshotDeliveryProperties": {
+					"DeliveryFrequency": "Six_Hours"
+				},
+				"S3BucketName": {
+					"Ref": "configBucket"
+				},
+				"S3KeyPrefix": "config-",
+				"SnsTopicARN": {
+					"Ref": "configTopic"
+				}
+			}
+		},
+		"configBucket": {
+			"Type": "AWS::S3::Bucket"
+		},
+		"configTopic": {
+			"Type": "AWS::SNS::Topic",
+			"Properties": {
+				"DisplayName": "config-topic"
+			}
+		},
+		"configTopicPolicy": {
+			"Type": "AWS::SNS::TopicPolicy",
+			"Properties": {
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Action": [
+							"sns:Publish"
+						],
+						"Resource": "*",
+						"Principal": {
+							"Service": "config.amazonaws.com"
+						},
+						"Effect": "Allow"
+					}]
+				},
+				"Topics": [{
+					"Ref": "configTopic"
+				}]
+			}
+		}
+	}
+}
