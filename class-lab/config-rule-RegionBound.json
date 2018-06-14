@@ -1,0 +1,28 @@
+{
+    "ConfigRuleName": "IAM-restrictedRegions",
+    "Source": {
+        "Owner": "CUSTOM_LAMBDA",
+        "SourceIdentifier": "arn:aws:lambda:us-east-2:514723210267:function:iam-validators-dev-Lambda-iam-policy-validate-restrictedRegions",
+        "SourceDetails": [
+            {
+                "EventSource": "aws.config",
+                "MessageType": "ScheduledNotification"
+            },
+            {
+                "EventSource": "aws.config",
+                "MessageType": "ConfigurationItemChangeNotification"
+            },
+            {
+                "EventSource": "aws.config",
+                "MessageType": "OversizedConfigurationItemChangeNotification"
+            }
+        ]
+    },
+    "InputParameters": "{}",
+    "Scope": {
+        "ComplianceResourceTypes": [
+            "AWS::IAM::Policy",
+            "AWS::IAM::Role"
+        ]
+    }
+}

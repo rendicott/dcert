@@ -61,3 +61,7 @@ config-rule-PowerfulActions.json  config-rule-RegionBound.json
   }
 }
 [ec2-user@ip-10-96-10-215 ~]$
+aws lambda add-permission --function-name iam-validators-dev-Lambda-iam-policy-validate-restrictedRegions --action lambda:InvokeFunction --principal config.amazonaws.com --source-account 514723210267 --statement-id 1
+aws lambda add-permission --function-name iam-validators-dev-Lambda-iam-policy-validate-powerfulActions --action lambda:InvokeFunction --principal config.amazonaws.com --source-account 514723210267 --statement-id 1
+aws configservice put-config-rule --config-rule file://config-rule-RegionBound.json
+aws configservice put-config-rule --config-rule file://config-rule-PowerfulActions.json

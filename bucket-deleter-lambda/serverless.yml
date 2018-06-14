@@ -1,0 +1,16 @@
+service: bucket-deleter
+provider:
+  name: aws
+  runtime: python2.7
+  region: us-east-2
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:Delete*"
+      Resource: "*"
+package:
+  include:
+    - delete-bucket.py
+functions:
+  delete-bucket:
+    handler: delete-bucket.lambda_handler
