@@ -1,0 +1,236 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template to build the ECS Parts for DevOps Lab-6 ECS
+Parameters:
+  QwiklabLocale:
+    Default: en
+    Description: >-
+      The locale of the student will be passed in to this parameter via the
+      Qwiklab platform (via the student's browser)
+    Type: String
+  ECRsiteURIPram:
+    Description: The ECR Repo URI for the MadLib/Website. (:latest Tag will be applied)
+    Type: String
+  ECRapiURIPram:
+    Description: The ECR Repo URI for the MadLib/API. (:latest Tag will be applied)
+    Type: String
+  ECRsaveURIPram:
+    Description: The ECR Repo URI for the MadLib/Save. (:latest Tag will be applied)
+    Type: String
+  BaseStack:
+    Description: The Name of the Stack that Qwiklabs had Launched for you
+    Type: String
+Mappings:
+  AmazonLinuxAMI:
+    us-east-1:
+      AMI: ami-08111162
+    us-east-2:
+      AMI: ami-06547163
+    us-west-1:
+      AMI: ami-1b0f7d7b
+    us-west-2:
+      AMI: ami-f0091d91
+    eu-west-1:
+      AMI: ami-31328842
+    eu-central-1:
+      AMI: ami-e2df388d
+    ap-northeast-1:
+      AMI: ami-f80e0596
+    ap-northeast-2:
+      AMI: ami-6598510b
+    ap-southeast-1:
+      AMI: ami-c9b572aa
+    ap-southeast-2:
+      AMI: ami-f2210191
+    sa-east-1:
+      AMI: ami-1e159872
+Resources:
+  # ALB Listener
+  MadLibECSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Fn::ImportValue: !Sub ${BaseStack}-siteTG
+      LoadBalancerArn:
+        Fn::ImportValue: !Sub ${BaseStack}-elbRef
+      Port: '80'
+      Protocol: HTTP
+  # Listener Rules
+  saveListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn:
+      - MadLibECSListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Fn::ImportValue: !Sub ${BaseStack}-saveTG
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/save_paragraph/*"
+      ListenerArn: !Ref MadLibECSListener
+      Priority: 1
+  apiListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn:
+      - MadLibECSListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Fn::ImportValue: !Sub ${BaseStack}-apiTG
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/get_random_word/*"
+      ListenerArn: !Ref MadLibECSListener
+      Priority: 2
+
+  # Defining teh ECS Tasks - Specs on what makes the app
+  siteECStask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: MadLib-Site
+      ContainerDefinitions:
+      - Name: MadLib-Site
+        Cpu: '10'
+        Essential: 'true'
+        Image: !Sub '${ECRsiteURIPram}:latest'
+        Memory: 300
+        PortMappings:
+         - ContainerPort: 80
+           HostPort: 80 # Not Needed if you are using Dynamic Port Allocation
+        Environment:
+         - Name: Port
+           Value: 80
+         - Name: ServerName
+           Value: Madlib-site
+         - Name: APIELB
+           Value:
+             Fn::ImportValue: !Sub ${BaseStack}-ELBDNS
+         - Name: SaveELB
+           Value:
+             Fn::ImportValue: !Sub ${BaseStack}-ELBDNS
+#        LogConfiguration:
+#          LogDriver: awslogs
+#          Options:
+#            awslogs-group: !Ref 'CloudwatchLogsGroup'
+#            awslogs-region: !Ref 'AWS::Region'
+#            awslogs-stream-prefix: ecs-madlib-site
+  apiECStask:
+   Type: AWS::ECS::TaskDefinition
+   DependsOn:
+     - siteECStask
+   Properties:
+     Family: MadLib-API
+     ContainerDefinitions:
+       - Name: MadLib-API
+         Cpu: 10
+         Essential: true
+         Image: !Sub '${ECRapiURIPram}:latest'
+         Memory: 200
+         PortMappings:
+           - ContainerPort: 81
+             HostPort: 81 # Not Needed if you are using Dynamic Port Allocation
+         Environment:
+          - Name: Port
+            Value: 82
+          - Name: NVM_DIR
+            Value: /usr/local/nvm
+          - Name: NODE_VERSION
+            Value: 6.10.3
+        #        LogConfiguration:
+        #          LogDriver: awslogs
+        #          Options:
+        #            awslogs-group: !Ref 'CloudwatchLogsGroup'
+        #            awslogs-region: !Ref 'AWS::Region'
+        #            awslogs-stream-prefix: ecs-madlib-api
+  saveECStask:
+   Type: AWS::ECS::TaskDefinition
+   DependsOn:
+     - siteECStask
+     - apiECStask
+   Properties:
+     Family: MadLib-Save
+     TaskRoleArn:
+       Fn::ImportValue: !Sub ${BaseStack}-AppRole
+     ContainerDefinitions:
+       - Name: MadLib-Save
+         Cpu: 10
+         Essential: true
+         Image: !Sub '${ECRsaveURIPram}:latest'
+         Memory: 200
+         PortMappings:
+           - ContainerPort: 82
+             HostPort: 82 # Not Needed if you are using Dynamic Port Allocation
+         Environment:
+          - Name: Port
+            Value: 82
+          - Name: NVM_DIR
+            Value: /usr/local/nvm
+          - Name: NODE_VERSION
+            Value: 6.10.3
+          - Name: AWS_REGION
+            Value: !Ref AWS::Region
+  #        LogConfiguration:
+  #          LogDriver: awslogs
+  #          Options:
+  #            awslogs-group: !Ref 'CloudwatchLogsGroup'
+  #            awslogs-region: !Ref 'AWS::Region'
+  #            awslogs-stream-prefix: ecs-madlib-api
+  # Defining the ECS Service - Definfing how you want to deploy the App (networking, cluster)
+  WebSiteService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - siteECStask
+      - MadLibECSListener
+    Properties:
+      Cluster:
+        Fn::ImportValue: !Sub ${BaseStack}-Cluster
+      DesiredCount: '1'
+    #  LoadBalancers:
+    #    - ContainerName: MadLib-Site
+    #      ContainerPort: 80
+    #      TargetGroupArn: !Ref 'WebSiteTG'
+    #  Role: !Ref 'ECSServiceRole'
+      TaskDefinition: !Ref 'siteECStask'
+  apiService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - apiECStask
+      - apiListenerRule
+    Properties:
+      Cluster:
+        Fn::ImportValue: !Sub ${BaseStack}-Cluster
+      DesiredCount: '1'
+  #    LoadBalancers:
+  #    - ContainerName: MadLib-API
+  #      ContainerPort: 81
+  #      TargetGroupArn: !Ref 'apiTG'
+  #    Role: !Ref 'ECSServiceRole'
+      TaskDefinition: !Ref 'apiECStask'
+  saveService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - saveECStask
+      - saveListenerRule
+    Properties:
+      Cluster:
+        Fn::ImportValue: !Sub ${BaseStack}-Cluster
+      DesiredCount: '1'
+  #    LoadBalancers:
+  #    - ContainerName: MadLib-Save
+  #      ContainerPort: 82
+  #      TargetGroupArn: !Ref 'saveTG'
+  #    Role: !Ref 'ECSServiceRole'
+      TaskDefinition: !Ref 'saveECStask'
+Outputs:
+  Region:
+    Value: !Ref 'AWS::Region'
+    Description: Region used for the lab
+  elbDNS:
+    Description: The Public DNS name for the ALB infront of the ECS Cluster
+    Value:
+      Fn::ImportValue: !Sub ${BaseStack}-ELBDNS
