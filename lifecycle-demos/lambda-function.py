@@ -133,6 +133,6 @@ def lambda_handler(event, context):
             else:
                 abandon_lifecycle(life_cycle_hook, auto_scaling_group, instance_id)
         else:
-            logging.error("No valid JSON message: %s", parsed_message)
+            logging.error("No valid JSON message: %s", event)
     except Exception, e:
         logging.error("Error: %s", str(e))
