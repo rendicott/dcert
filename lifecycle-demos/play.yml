@@ -8,14 +8,23 @@
       yum:
         name: *
         state: latest
-    - name: setup node repo
-      raw: curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
-    - name: install nodejs
-      yum:
-        name: nodejs
-        state: present
-    - name: install serverless framework
-      npm:
-        name: serverless
-        global: yes
+    - name: download webby
+      get_url:
+        url: https://github.com/rendicott/dcert/releases/download/webby-v0.1/webby
+        dest: /tmp
+        mode: 0777
+    - name: download service config
+      get_url:
+        url: https://raw.githubusercontent.com/rendicott/dcert/master/webby/webby.service
+        dest: /lib/systemd/systemd/system/webby.service
+        mode: 0755
+    - name: Add the user 'webby' with a specific uid and a primary group of 'admin'
+      user:
+        name: webby 
+        comment: webby service user
+    - name: Enable webby service
+      service:
+        name: webby 
+        enabled: yes
+        state: started
 ...
