@@ -1,10 +1,30 @@
+#!/usr/bin/env python
+#
+# uplaunch.py
+# 
+# Script to upload CloudFormation template to specific S3 bucket and 
+# then run a create_stack or update_stack depending on input parameters.
+# It will then poll the operation until a success or failure message 
+# is returned from the stack status.
+#
+# Usage:
+#  ./uplaunch.py <template file> <stack prefix> (<existing stack name>)
+#
+# Example:
+# To create a new stack named "whatever-1029401-1231048a-12031283"
+#  ./uplaunch.py lc.yml whatever-
+# The guid postfix will be added for you
+#
+# To update an existing stack with a new template
+#  ./uplaunch.py lc.yml whatever- whatever-1029401-1231048a-12031283
+#
+
 import boto3
 import sys
 import uuid
 import time
 import json
 
-# arn:aws:s3:::raws-builds
 stack_prefix = sys.argv[2]
 bucketname = "raws-builds"
 region = "us-east-2"
