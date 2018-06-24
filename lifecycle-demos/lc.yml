@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  SourcePublicIp:
+    Type: String
+    Default: 75.15.178.83/32
+    Description: "Public IP that SSH is allowed from"
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+      - t2.micro
+      - t2.medium
+      - m5.large
+    Description: "Enter instance type, t2.micro, t2.medium, or m5.large. Default is t2.medium"
+  PrefixParameter:
+    Type: String
+    Default: lifecycle-testing_
+    Description: "Enter prefix parameter that resources will be tagged with."
+  ImageParameter:
+    Type: String
+    Default: ami-922914f7
+    Description: "Enter the AMI id."
+  KeyName:
+    Type: String
+    Default: rpers-o-2
+    Description: Keypair name
+Description: "lifecycle testing"
+Resources:
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+        Count: '2'
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: '1'
+        MinInstancesInService: '1'
+        PauseTime: PT15M
+        WaitOnResourceSignals: 'true'
+    Properties:
+      AvailabilityZones: !GetAZs ''
+      LaunchConfigurationName: !Ref 'LaunchConfig'
+      MinSize: '2'
+      MaxSize: '4'
+      LoadBalancerNames: [!Ref 'ElasticLoadBalancer']
+  LaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: !Ref 'KeyName'
+      ImageId: !Ref 'ImageParameter'
+      InstanceType: !Ref 'InstanceTypeParameter'
+      SecurityGroups: [!Ref 'InstanceSecurityGroup']
+      IamInstanceProfile: !Ref 'WebServerInstanceProfile'
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - "yum install python-pip -y\n"
+            - "yum install git -y\n"
+            - "pip install ansible\n"
+            - "/usr/local/bin/ansible-pull -U https://github.com/rendicott/dcert/\
+              \ ./lifecycle-demos/play.yml\n"
+            - "yum install -y aws-cfn-bootstrap\n"
+            - "/opt/aws/bin/cfn-signal -e 0 --stack "
+            - !Ref 'AWS::StackName'
+            - " --resource AutoScalingGroup "
+            - " --region "
+            - !Ref 'AWS::Region'
+            - "\n"
+  ElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      AvailabilityZones: !GetAZs ''
+      CrossZone: 'true'
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+      HealthCheck:
+        Target: HTTP:80/
+        HealthyThreshold: '3'
+        UnhealthyThreshold: '5'
+        Interval: '30'
+        Timeout: '5'
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access and HTTP access on the configured port
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: !Ref 'SourcePublicIp'
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref 'DescribeHealthRole']
+  DescribeHealthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: describe-instance-health-policy
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: ['elasticloadbalancing:DescribeInstanceHealth']
+            Resource: '*'
+Outputs:
+  URL:
+    Description: URL of the website
+    Value: !Join ['', ['http://', !GetAtt [ElasticLoadBalancer, DNSName]]]

@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  SourcePublicIp:
+    Type: String
+    Default: 75.15.178.83/32
+    Description: "Public IP that SSH is allowed from"
+  InstanceTypeParameter:
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+      - t2.micro
+      - t2.medium
+      - m5.large
+    Description: "Enter instance type, t2.micro, t2.medium, or m5.large. Default is t2.medium"
+  PrefixParameter:
+    Type: String
+    Default: lifecycle-testing_
+    Description: "Enter prefix parameter that resources will be tagged with."
+  ImageParameter:
+    Type: String
+    Default: ami-922914f7
+    Description: "Enter the AMI id."
+  KeyName:
+    Type: String
+    Default: rpers-o-2
+    Description: Keypair name
+Description: "lifecycle testing"
+Resources:
+  ApplicationWaitCondition:
+    DependsOn: EC2Instance
+    Properties:
+      Handle: !Ref 'ApplicationWaitHandle'
+      Timeout: '4500'
+    Type: AWS::CloudFormation::WaitCondition
+  ApplicationWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref 'PrefixParameter', 'instance' ]]
+      InstanceType: !Ref 'InstanceTypeParameter'
+      IamInstanceProfile: !Ref 'adminAccessRole'
+      SecurityGroups:
+        - !Ref 'InstanceSecurityGroup'
+      KeyName: !Ref 'KeyName' 
+      ImageId: !Ref 'ImageParameter'
+      UserData: !Base64
+        Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - export WAITHANDLE='
+            - !Ref 'ApplicationWaitHandle'
+            - "'\n"
+            - "yum install python-pip -y\n"
+            - "yum install git -y\n"
+            - "pip install ansible\n"
+            - "/usr/local/bin/ansible-pull -U https://github.com/rendicott/dcert/\
+              \ ./waitcondition-signal/play.yml\n"
+            - "\n"
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref 'SourcePublicIp'
+  adminAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: admin-access-profile
+  adminAccessInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref 'adminAccessRole'
+      InstanceProfileName: admin-access-profile

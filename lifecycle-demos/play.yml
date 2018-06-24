@@ -1,0 +1,21 @@
+---
+- name: boostrap new box
+  hosts: localhost
+  gather_facts: false
+  connection: smart
+  tasks:
+    - name: upgrade all packages
+      yum:
+        name: *
+        state: latest
+    - name: setup node repo
+      raw: curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
+    - name: install nodejs
+      yum:
+        name: nodejs
+        state: present
+    - name: install serverless framework
+      npm:
+        name: serverless
+        global: yes
+...
