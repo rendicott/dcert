@@ -4,6 +4,18 @@ Parameters:
     Type: String
     Default: 75.15.178.83/32
     Description: "Public IP that SSH is allowed from"
+  LogBackupFunctionZipBucket:
+    Type: String
+    Default: raws-builds
+    Description: "S3 bucket that holds the lambda function code"
+  LogBackupFunctionZipKey:
+    Type: String
+    Default: log-backup-lambda/lambda-function-0.2.zip
+    Description: "Key path to lambda function zip in S3 bucket"
+  TopicSubscriptionEmailAddress:
+    Type: String
+    Default: rendicott@gmail.com
+    Description: "Email address to copy lifecycle terminate event notifications to."
   InstanceTypeParameter:
     Type: String
     Default: t2.medium
@@ -24,7 +36,7 @@ Parameters:
     Type: String
     Default: rpers-o-2
     Description: Keypair name
-Description: "lifecycle testing"
+Description: "Websevers behind ELB in ASG with lifecycle termination hook that runs a lambda that runs SSN on the terminating node to upload logs tarball to s3."
 Resources:
   WebServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -41,9 +53,56 @@ Resources:
     Properties:
       AvailabilityZones: !GetAZs ''
       LaunchConfigurationName: !Ref 'LaunchConfig'
+      DesiredCapacity: '2'
       MinSize: '2'
       MaxSize: '4'
       LoadBalancerNames: [!Ref 'ElasticLoadBalancer']
+  LogsBackupLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  ASGBackupPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ["", [!Ref "AWS::StackName", "_ASGBackup"]]
+      Roles:
+        - !Ref "LogsBackupLambdaRole"
+        - !Ref "WebServerRole"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: 
+              - "autoscaling:CompleteLifecycleAction"
+              - "sns:Publish"
+            Resource: "*"
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref 'WebServerRole'
+  WebServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
   LaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -78,7 +137,7 @@ Resources:
         InstancePort: '80'
         Protocol: HTTP
       HealthCheck:
-        Target: HTTP:80/
+        Target: HTTP:80/healthcheck
         HealthyThreshold: '3'
         UnhealthyThreshold: '5'
         Interval: '30'
@@ -96,28 +155,120 @@ Resources:
         FromPort: '80'
         ToPort: '80'
         CidrIp: 0.0.0.0/0
-  WebServerInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Path: /
-      Roles: [!Ref 'DescribeHealthRole']
-  DescribeHealthRole:
+  LogsBucket:
+    Type: AWS::S3::Bucket
+  SNSPublishRole:
     Type: AWS::IAM::Role
     Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service: [ec2.amazonaws.com]
-          Action: ['sts:AssumeRole']
-      Path: /
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "autoscaling.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
       Policies:
-      - PolicyName: describe-instance-health-policy
-        PolicyDocument:
-          Statement:
-          - Effect: Allow
-            Action: ['elasticloadbalancing:DescribeInstanceHealth']
-            Resource: '*'
+        -
+          PolicyName: !Join ['', [!Ref "AWS::StackName", "_publish_policy"]]
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sns:Publish
+              Resource:
+              - !Ref 'OnTerminateTopic'
+  LogsBackupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          SSM_DOCUMENT: !Ref "OnTerminateSSMDocument"
+      Code:
+        S3Bucket: !Ref LogBackupFunctionZipBucket
+        S3Key: !Ref "LogBackupFunctionZipKey"
+      Runtime: "python2.7"
+      Role: !GetAtt "LogsBackupLambdaRole.Arn"
+      Handler: "lambda-function.lambda_handler"
+  OnTerminateLifecyleHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref "WebServerGroup"
+      LifecycleTransition: "autoscaling:EC2_INSTANCE_TERMINATING"
+      NotificationTargetARN: !Ref "OnTerminateTopic"
+      RoleARN: !GetAtt SNSPublishRole.Arn
+  OnTerminateEventRule:
+    Type: "AWS::Events::Rule"
+    Properties: 
+      EventPattern:
+        source:
+          - "aws.autoscaling"
+        detail-type:
+          - "EC2 Instance-terminate Lifecycle Action"
+        detail:
+          AutoScalingGroupName:
+            - !Ref "WebServerGroup"
+      State: "ENABLED"
+      Targets:
+        -
+          Arn: !GetAtt "LogsBackupLambda.Arn"
+          Id: log-backup-v1
+  PermissionForEventsToInvokeLambda: 
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      FunctionName: !Ref "LogsBackupLambda"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt OnTerminateEventRule.Arn
+  OnTerminateTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription: 
+        - 
+          Endpoint: !Ref "TopicSubscriptionEmailAddress"
+          Protocol: "email"
+  OnTerminateSSMDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        schemaVersion: '1.2'
+        description: Backup logs to S3
+        parameters: {}
+        runtimeConfig:
+          aws:runShellScript:
+            properties:
+              - id: '0.aws:runShellScript'
+                runCommand:
+                  - ''
+                  - !Join ['', ["ASGNAME=", !Ref "WebServerGroup"]]
+                  - !Join ['', ["LIFECYCLEHOOKNAME=", !Ref "OnTerminateLifecyleHook"]]
+                  - BACKUPDIRECTORY='/var/log'
+                  - !Join ['', ["S3BUCKET=", !Ref "LogsBucket"]]
+                  - INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+                  - REGION=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)
+                  - REGION=${REGION::-1}
+                  - !Join ['', ["SNSTARGET=", !Ref "OnTerminateTopic"]]
+                  - HOOKRESULT='CONTINUE'
+                  - MESSAGE=''
+                  - ''
+                  - tar -cf /tmp/${INSTANCEID}.tar $BACKUPDIRECTORY &> /tmp/backup
+                  - if [ $? -ne 0 ]
+                  - then
+                  - '   MESSAGE=$(cat /tmp/backup)'
+                  - else
+                  - '   aws s3 cp /tmp/${INSTANCEID}.tar s3://${S3BUCKET}/${INSTANCEID}/
+                    &> /tmp/backup'
+                  - '       MESSAGE=$(cat /tmp/backup)'
+                  - fi
+                  - ''
+                  - aws sns publish --subject 'ASG Backup' --message "$MESSAGE"  --target-arn
+                    ${SNSTARGET} --region ${REGION}
+                  - aws autoscaling complete-lifecycle-action --lifecycle-hook-name
+                    ${LIFECYCLEHOOKNAME} --auto-scaling-group-name ${ASGNAME} --lifecycle-action-result
+                    ${HOOKRESULT} --instance-id ${INSTANCEID}  --region ${REGION}
 Outputs:
   URL:
     Description: URL of the website

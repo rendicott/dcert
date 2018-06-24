@@ -28,6 +28,7 @@ def cfn_poller(client, stack_name):
     counter =0
     max = 30
     done = False
+    time.sleep(5)
     while True:
         if counter > max:
             break
@@ -38,10 +39,13 @@ def cfn_poller(client, stack_name):
         for stack in response.get("Stacks"):
             if stack.get("StackName") == stack_name:
                 stack_status = stack.get("StackStatus") 
-                if stack_status == "ROLLBACK_COMPLETE":
+                if (stack_status == "ROLLBACK_COMPLETE" or 
+                    stack_status == "UPDATE_ROLLBACK_COMPLETE" or 
+                    stack_status == "CREATE_FAILED"):
                     done=True
                     break
-                if stack_status == "CREATE_COMPLETE":
+                if (stack_status == "CREATE_COMPLETE" or
+                    stack_status == "UPDATE_COMPLETE"):
                     print json.dumps(
                         stack.get("Outputs"),
                         indent=4
@@ -73,8 +77,10 @@ with open(template, 'rb') as f:
         Key=template
     )
     handle_response(response)
-    
-stack_name = stack_prefix + str(uuid.uuid1())
+if update_stack == "":
+    stack_name = stack_prefix + str(uuid.uuid1())
+else:
+    stack_name = update_stack
 print("Attempting to create '%s' using template '%s'" % (stack_name, url))
 client = session.client("cloudformation")
 if update_stack == "":
