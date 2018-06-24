@@ -6,7 +6,7 @@
   tasks:
     - name: upgrade all packages
       yum:
-        name: *
+        name: "*"
         state: latest
     - name: download webby
       get_url:
