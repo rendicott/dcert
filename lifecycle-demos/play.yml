@@ -18,7 +18,7 @@
         url: https://raw.githubusercontent.com/rendicott/dcert/master/webby/webby.initd
         dest: /etc/init.d/webby
         mode: 0755
-    - name: Add the user 'webby' with a specific uid and a primary group of 'admin'
+    - name: Add the user 'webby'
       user:
         name: webby 
         comment: webby service user
