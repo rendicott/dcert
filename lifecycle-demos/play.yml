@@ -15,8 +15,8 @@
         mode: 0777
     - name: download service config
       get_url:
-        url: https://raw.githubusercontent.com/rendicott/dcert/master/webby/webby.service
-        dest: /lib/systemd/systemd/system/webby.service
+        url: https://raw.githubusercontent.com/rendicott/dcert/master/webby/webby.initd
+        dest: /etc/init.d/webby
         mode: 0755
     - name: Add the user 'webby' with a specific uid and a primary group of 'admin'
       user:
