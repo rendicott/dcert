@@ -19,5 +19,6 @@ Need to read up on the following
 * Make a Lambda function that is a Custom Resource in a CloudFormation template
 * Deploy an application using Elastic Beanstalk
 * Setup CloudWatch logs agent on a few EC2 instances
+* play with ebs volumes, snapshots, and tagging them, describe-snapshots
 
 
