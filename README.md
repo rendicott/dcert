@@ -14,11 +14,13 @@ Need to read up on the following
 * Read about EBS Snapshots
 
 * DataPipeline and Cognito
+* read about pre-warming, is it still a thing?
 
 ## EXERCISES
 * Make a Lambda function that is a Custom Resource in a CloudFormation template
 * Deploy an application using Elastic Beanstalk
 * Setup CloudWatch logs agent on a few EC2 instances
 * play with ebs volumes, snapshots, and tagging them, describe-snapshots
+   * maybe look at RAID and LVM on ec2 as well
 
 

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"net/http"
 	"fmt"
+	"net/http"
 )
 
 var (
 	version = "0.1"
 )
+
 func HandlerHealthcheck(w http.ResponseWriter, r *http.Request) {
 	msg := "healthy " + version
 	fmt.Fprintf(w, msg)
