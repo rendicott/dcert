@@ -1,0 +1,4 @@
+#!/bin/bash
+oldnum=`cut -d ',' -f2 bversion` 
+newnum=`expr $oldnum + 1`
+sed -i "s/$oldnum\$/$newnum/g" bversion 
