@@ -20,7 +20,7 @@
       "EC2Instance" : {
         "Type" : "AWS::EC2::Instance",
         "Properties" : {
-          "Tags": [{"Key": "Name", "Value":"rpers-testing"}],
+          "Tags": [{"Key": "Name", "Value":"bastion"}],
           "InstanceType" : "t2.medium",
           "IamInstanceProfile": {"Ref": "adminAccessRole"},
           "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
