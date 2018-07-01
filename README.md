@@ -35,3 +35,7 @@ Setup CloudWatch logs agent on a few EC2 instances
    * throughput
       * 1 RCU is 1 read per second up to 4kb, 1 WCU is 1 write per second up to 1kb
       * e.g., want to read 80 3kb things per seconds so need 80 RCU for strong consistent reads or 40 RCU for eventual consistent read
+* s3
+   * standard storage 4 9's avail
+   * Infrequent access 3 9's avail
+   * RRS - less durability
