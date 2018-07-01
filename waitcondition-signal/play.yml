@@ -10,6 +10,10 @@
         state: latest
     - name: setup node repo
       raw: curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
+    - name: install golang 
+      yum:
+        name: golang 
+        state: present
     - name: install nodejs
       yum:
         name: nodejs
